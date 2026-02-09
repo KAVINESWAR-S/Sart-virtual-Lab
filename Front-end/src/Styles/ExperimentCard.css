@@ -1,0 +1,27 @@
+.experiment-card {
+  @apply bg-white rounded-xl shadow-md p-5 hover:shadow-lg transition cursor-pointer;
+}
+
+.experiment-card-title {
+  @apply text-lg font-semibold text-gray-800;
+}
+
+.experiment-card-subject {
+  @apply text-sm text-gray-500 mt-1;
+}
+
+.experiment-card-badge {
+  @apply inline-block mt-3 px-3 py-1 text-xs rounded-full;
+}
+
+.status-completed {
+  @apply bg-green-100 text-green-700;
+}
+
+.status-pending {
+  @apply bg-yellow-100 text-yellow-700;
+}
+
+.status-not-started {
+  @apply bg-red-100 text-red-700;
+}
