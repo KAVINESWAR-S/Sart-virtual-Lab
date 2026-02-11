@@ -4,11 +4,12 @@ import TeacherDashboard from "./components/dashboard/TeacherDashboard";
 import Login from "./components/auth/Login";
 import Register from "./components/auth/Register";
 import ExperimentPage from "./pages/ExperimentPage";
+import FreeSimulator from "./pages/FreeSimulator";
 import { AuthProvider, useAuth } from "./context/AuthContext";
-
-// Protected Route Component
+import Navbar from "./components/common/Navbar";
 import AdminDashboard from './components/dashboard/AdminDashboard';
 
+// Protected Route Component
 const ProtectedRoute = ({ children, role }) => {
   const { user, loading } = useAuth();
   if (loading) return <div>Loading...</div>;
@@ -21,9 +22,17 @@ function App() {
   return (
     <Router>
       <AuthProvider>
+        <Navbar />
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
+
+          {/* Standalone Simulator Route */}
+          <Route path="/experiment/simulator/simulation" element={
+            <ProtectedRoute role="student">
+              <FreeSimulator />
+            </ProtectedRoute>
+          } />
 
           <Route path="/teacher-dashboard" element={
             <ProtectedRoute role="teacher">

@@ -33,14 +33,15 @@ const Register = () => {
             <div className="bg-gray-800 p-8 rounded-lg shadow-lg w-96">
                 <h2 className="text-2xl font-bold mb-6 text-center">Register</h2>
                 {error && <p className="text-red-500 mb-4 text-sm bg-red-900/50 p-2 rounded">{error}</p>}
-                <form onSubmit={handleSubmit}>
+                <form onSubmit={onSubmit}>
                     <div className="mb-4">
                         <label className="block text-sm font-medium mb-1">Name</label>
                         <input
                             type="text"
+                            name="name"
                             className="w-full p-2 rounded bg-gray-700 border border-gray-600 focus:outline-none focus:border-blue-500"
                             value={name}
-                            onChange={(e) => setName(e.target.value)}
+                            onChange={onChange}
                             required
                         />
                     </div>
@@ -48,9 +49,10 @@ const Register = () => {
                         <label className="block text-sm font-medium mb-1">Email</label>
                         <input
                             type="email"
+                            name="email"
                             className="w-full p-2 rounded bg-gray-700 border border-gray-600 focus:outline-none focus:border-blue-500"
                             value={email}
-                            onChange={(e) => setEmail(e.target.value)}
+                            onChange={onChange}
                             required
                         />
                     </div>

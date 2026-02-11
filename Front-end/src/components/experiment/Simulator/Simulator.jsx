@@ -42,12 +42,15 @@ const getId = () => `dndnode_${id++}`;
 const DEFAULT_NODES = [];
 const DEFAULT_EDGES = [];
 
-const Simulator = ({ onSubmit, initialNodes = DEFAULT_NODES, initialEdges = DEFAULT_EDGES, readOnly = false }) => {
+const Simulator = ({ onSubmit, initialNodes = DEFAULT_NODES, initialEdges = DEFAULT_EDGES, readOnly = false, timeLimit }) => {
     const reactFlowWrapper = useRef(null);
     const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
     const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
     const [reactFlowInstance, setReactFlowInstance] = useState(null);
     const [isRunning, setIsRunning] = useState(false);
+
+    // Timer state
+    const [timeLeft, setTimeLeft] = useState(timeLimit || null);
 
     // Sync state with props when they change
     useEffect(() => {
@@ -62,6 +65,25 @@ const Simulator = ({ onSubmit, initialNodes = DEFAULT_NODES, initialEdges = DEFA
         setNodes(hydratedNodes);
         setEdges(initialEdges);
     }, [initialNodes, initialEdges, setNodes, setEdges]); // Fixed dependency array
+
+    // Timer Logic
+    useEffect(() => {
+        let timer;
+        if (timeLimit && timeLeft > 0 && !readOnly) {
+            timer = setInterval(() => {
+                setTimeLeft((prev) => prev - 1);
+            }, 1000);
+        } else if (timeLeft === 0 && !readOnly && onSubmit) {
+            onSubmit({ nodes, edges }); // Auto-submit
+        }
+        return () => clearInterval(timer);
+    }, [timeLeft, timeLimit, readOnly, onSubmit, nodes, edges]);
+
+    const formatTime = (seconds) => {
+        const minutes = Math.floor(seconds / 60);
+        const secs = seconds % 60;
+        return `${minutes}:${secs < 10 ? '0' : ''}${secs}`;
+    };
 
     // Handle Drag & Drop
     const onDragOver = useCallback((event) => {
@@ -142,40 +164,51 @@ const Simulator = ({ onSubmit, initialNodes = DEFAULT_NODES, initialEdges = DEFA
     }, [setNodes, setEdges]);
 
     return (
-        <div className="flex h-[600px] w-full border border-gray-300 rounded-lg overflow-hidden bg-gray-50">
+        <div className="flex h-[600px] w-full border border-slate-700/50 rounded-xl overflow-hidden bg-slate-950">
             <ReactFlowProvider>
                 {!readOnly && <ComponentPalette />}
 
                 <div className="flex-grow h-full relative" ref={reactFlowWrapper}>
-                    <div className="absolute top-4 right-4 z-10 bg-white p-2 rounded shadow flex gap-2">
+                    <div className="absolute top-4 right-4 z-10 bg-slate-900/90 backdrop-blur p-2 rounded-xl shadow-xl border border-slate-700 flex gap-2 items-center">
+
+                        {/* Timer Display */}
+                        {timeLeft !== null && !readOnly && (
+                            <div className={`mr-2 font-mono font-bold px-3 py-2 rounded-lg border ${timeLeft < 60 ? 'text-red-500 border-red-500/50 animate-pulse' : 'text-blue-400 border-blue-500/30'}`}>
+                                ⏱ {formatTime(timeLeft)}
+                            </div>
+                        )}
+
                         <button
                             onClick={toggleSimulation}
-                            className={`px-4 py-2 rounded font-bold transition ${isRunning ? 'bg-red-100 text-red-600 border border-red-300' : 'bg-green-100 text-green-600 border border-green-300'
+                            className={`px-4 py-2 rounded-lg font-bold transition flex items-center gap-2 ${isRunning
+                                ? 'bg-red-500/20 text-red-400 border border-red-500/50 hover:bg-red-500/30'
+                                : 'bg-green-500/20 text-green-400 border border-green-500/50 hover:bg-green-500/30'
                                 }`}
                         >
-                            {isRunning ? '⏹ Stop Simulation' : '▶ Run Simulation'}
+                            {isRunning ? '⏹ Stop' : '▶ Run'}
                         </button>
                         {!readOnly && (
                             <>
                                 <button
                                     onClick={deleteSelected}
-                                    className="px-4 py-2 rounded bg-orange-100 text-orange-600 border border-orange-300 hover:bg-orange-200"
+                                    className="px-3 py-2 rounded-lg bg-slate-800 text-slate-300 border border-slate-600 hover:bg-slate-700 hover:text-white transition-colors"
                                     title="Delete Selected (Backspace)"
                                 >
-                                    🗑 Delete
+                                    🗑
                                 </button>
                                 <button
                                     onClick={() => { setNodes([]); setEdges([]); }}
-                                    className="px-4 py-2 rounded bg-gray-100 text-gray-600 border border-gray-300 hover:bg-gray-200"
+                                    className="px-3 py-2 rounded-lg bg-slate-800 text-slate-300 border border-slate-600 hover:bg-slate-700 hover:text-white transition-colors"
+                                    title="Clear All"
                                 >
-                                    Clear All
+                                    Clear
                                 </button>
                             </>
                         )}
                         {onSubmit && !readOnly && (
                             <button
                                 onClick={() => onSubmit({ nodes, edges })}
-                                className="px-4 py-2 rounded bg-blue-100 text-blue-600 border border-blue-300 hover:bg-blue-200 font-bold"
+                                className="px-4 py-2 rounded-lg bg-blue-600 text-white border border-blue-500 hover:bg-blue-500 font-bold shadow-lg shadow-blue-900/20"
                             >
                                 💾 Submit
                             </button>
@@ -197,9 +230,10 @@ const Simulator = ({ onSubmit, initialNodes = DEFAULT_NODES, initialEdges = DEFA
                         nodesConnectable={!readOnly}
                         elementsSelectable={true}
                         fitView
+                        className="bg-slate-950"
                     >
-                        <Controls />
-                        <Background variant="dots" gap={12} size={1} />
+                        <Controls className="bg-slate-800 border-slate-700 fill-slate-300 [&>button]:border-slate-700 [&>button]:bg-slate-800 [&>button:hover]:bg-slate-700 [&>button__svg]:fill-slate-300" />
+                        <Background variant="dots" gap={12} size={1} color="#334155" />
                     </ReactFlow>
                 </div>
             </ReactFlowProvider>

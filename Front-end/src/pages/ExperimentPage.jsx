@@ -71,39 +71,37 @@ const ExperimentPage = () => {
     };
 
     return (
-        <div className="min-h-screen bg-gray-50 flex flex-col md:flex-row">
+        <div className="min-h-screen text-slate-200 flex flex-col md:flex-row">
             {/* Sidebar needs to be updated or mocked if it relies on hardcoded indices */}
             {/* Assuming sidebar takes activeTab and setter, it should work fine */}
             <Sidebar activeTab={activeTab} onTabChange={setActiveTab} />
 
-            <div className="flex-grow p-6 lg:p-10 transition-all duration-300 md:ml-64">
-                <div className="md:hidden bg-white shadow-sm p-4 sticky top-0 z-20 flex justify-between items-center mb-6 rounded">
-                    <h1 className="font-bold text-gray-800 truncate">{experiment.title}</h1>
+            <div className="flex-grow p-4 lg:p-8 transition-all duration-300 md:ml-64">
+                <div className="md:hidden glass-panel p-4 sticky top-4 z-20 flex justify-between items-center mb-6">
+                    <h1 className="font-bold text-white truncate">{experiment.title}</h1>
                     <button
                         onClick={() => navigate("/student-dashboard")}
-                        className="text-sm text-blue-600 font-medium"
+                        className="text-xs bg-slate-800 px-3 py-1.5 rounded-lg text-slate-300 border border-slate-700 hover:text-white hover:border-slate-500 transition-colors"
                     >
                         Exit
                     </button>
                 </div>
 
-                <div className="max-w-4xl mx-auto">
-                    <header className="mb-8 hidden md:block border-b pb-4">
-                        <div className="flex justify-between items-center">
+                <div className="max-w-5xl mx-auto">
+                    <header className="mb-8 hidden md:block border-b border-slate-700/50 pb-6">
+                        <div className="flex justify-between items-end">
                             <div>
-                                <h1 className="text-3xl font-bold text-gray-900">{experiment.title}</h1>
-                                <p className="text-gray-500 mt-1">Classroom Code: {experiment.code}</p>
+                                <h1 className="text-3xl font-bold bg-gradient-to-r from-white to-slate-400 bg-clip-text text-transparent">{experiment.title}</h1>
+                                <p className="text-slate-400 mt-2 flex items-center gap-2">
+                                    <span className="px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 text-xs font-mono border border-blue-500/20">
+                                        CODE: {experiment.code}
+                                    </span>
+                                </p>
                             </div>
-                            <button
-                                onClick={() => navigate("/student-dashboard")}
-                                className="text-blue-600 hover:text-blue-800"
-                            >
-                                ← Back to Dashboard
-                            </button>
                         </div>
                     </header>
 
-                    <main className="fade-in bg-white p-6 rounded shadow-sm min-h-[500px]">
+                    <main className="fade-in glass-panel p-6 min-h-[500px] border border-slate-700/50 relative overflow-hidden">
                         {renderContent()}
                     </main>
                 </div>

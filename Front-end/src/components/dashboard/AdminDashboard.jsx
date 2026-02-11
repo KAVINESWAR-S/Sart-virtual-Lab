@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useAuth } from '../../context/AuthContext';
+import { motion } from 'framer-motion';
+import { FaUserPlus, FaEnvelope, FaLock, FaUser, FaTrash, FaChalkboardTeacher } from 'react-icons/fa';
 
 const AdminDashboard = () => {
-    const { user, logout } = useAuth();
+    const { user } = useAuth();
     const [users, setUsers] = useState([]);
     const [activeTab, setActiveTab] = useState('students'); // 'students' or 'teachers'
     const [loading, setLoading] = useState(true);
@@ -60,12 +62,11 @@ const AdminDashboard = () => {
 
     return (
         <div className="min-h-screen bg-gray-900 text-white p-6">
-            <div className="flex justify-between items-center mb-8">
-                <h1 className="text-3xl font-bold text-red-500">Admin Dashboard</h1>
-                <div className="flex items-center gap-4">
-                    <span>Admin: {user.name}</span>
-                    <button onClick={logout} className="bg-red-600 px-4 py-2 rounded hover:bg-red-700">Logout</button>
-                </div>
+            <div className="mb-8">
+                <h1 className="text-3xl font-bold bg-gradient-to-r from-red-500 to-orange-500 bg-clip-text text-transparent">
+                    Admin Dashboard
+                </h1>
+                <p className="text-slate-400">Manage users and system settings</p>
             </div>
 
             <div className="flex gap-4 mb-6 border-b border-gray-700 pb-4">
@@ -85,44 +86,79 @@ const AdminDashboard = () => {
 
             {/* Create Teacher Form (Only visible in Teachers tab) */}
             {activeTab === 'teachers' && (
-                <div className="bg-gray-800 p-6 rounded-lg shadow-lg mb-8 border border-gray-700">
-                    <h2 className="text-xl font-bold mb-4">Create New Teacher Account</h2>
-                    <form onSubmit={createTeacher} className="flex gap-4 items-end flex-wrap">
-                        <div>
-                            <label className="block text-sm mb-1">Name</label>
-                            <input
-                                type="text"
-                                className="p-2 rounded bg-gray-700 border border-gray-600 text-white"
-                                value={newTeacher.name}
-                                onChange={(e) => setNewTeacher({ ...newTeacher, name: e.target.value })}
-                                required
-                            />
+                <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="glass-panel p-8 mb-8 border border-purple-500/30 relative overflow-hidden"
+                >
+                    <div className="absolute top-0 right-0 p-4 opacity-5">
+                        <FaChalkboardTeacher size={100} />
+                    </div>
+
+                    <h2 className="text-2xl font-bold mb-6 flex items-center gap-3">
+                        <div className="p-2 bg-purple-500/20 rounded-lg text-purple-400">
+                            <FaUserPlus />
                         </div>
+                        Onboard New Instructor
+                    </h2>
+
+                    <form onSubmit={createTeacher} className="grid grid-cols-1 md:grid-cols-3 gap-6 items-end">
                         <div>
-                            <label className="block text-sm mb-1">Email</label>
-                            <input
-                                type="email"
-                                className="p-2 rounded bg-gray-700 border border-gray-600 text-white"
-                                value={newTeacher.email}
-                                onChange={(e) => setNewTeacher({ ...newTeacher, email: e.target.value })}
-                                required
-                            />
+                            <label className="block text-sm font-medium text-slate-400 mb-2">Full Name</label>
+                            <div className="relative">
+                                <FaUser className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                                <input
+                                    type="text"
+                                    className="glass-input w-full pl-10 focus:ring-purple-500/50"
+                                    placeholder="Prof. John Doe"
+                                    value={newTeacher.name}
+                                    onChange={(e) => setNewTeacher({ ...newTeacher, name: e.target.value })}
+                                    required
+                                />
+                            </div>
                         </div>
+
                         <div>
-                            <label className="block text-sm mb-1">Password</label>
-                            <input
-                                type="password"
-                                className="p-2 rounded bg-gray-700 border border-gray-600 text-white"
-                                value={newTeacher.password}
-                                onChange={(e) => setNewTeacher({ ...newTeacher, password: e.target.value })}
-                                required
-                            />
+                            <label className="block text-sm font-medium text-slate-400 mb-2">Email Address</label>
+                            <div className="relative">
+                                <FaEnvelope className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                                <input
+                                    type="email"
+                                    className="glass-input w-full pl-10 focus:ring-purple-500/50"
+                                    placeholder="instructor@university.edu"
+                                    value={newTeacher.email}
+                                    onChange={(e) => setNewTeacher({ ...newTeacher, email: e.target.value })}
+                                    required
+                                />
+                            </div>
                         </div>
-                        <button type="submit" className="bg-green-600 px-6 py-2 rounded font-bold hover:bg-green-700 h-10">
-                            Create Teacher
-                        </button>
+
+                        <div>
+                            <label className="block text-sm font-medium text-slate-400 mb-2">Temporary Password</label>
+                            <div className="relative">
+                                <FaLock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                                <input
+                                    type="password"
+                                    className="glass-input w-full pl-10 focus:ring-purple-500/50"
+                                    placeholder="••••••••"
+                                    value={newTeacher.password}
+                                    onChange={(e) => setNewTeacher({ ...newTeacher, password: e.target.value })}
+                                    required
+                                />
+                            </div>
+                        </div>
+
+                        <div className="md:col-span-3 flex justify-end mt-4">
+                            <button
+                                type="submit"
+                                className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold py-3 px-8 rounded-xl shadow-lg shadow-purple-900/20 transition-all transform hover:scale-[1.02] flex items-center gap-2"
+                            >
+                                <FaUserPlus />
+                                Create Faculty Account
+                            </button>
+                        </div>
                     </form>
-                </div>
+                </motion.div>
             )}
 
             {/* User List */}

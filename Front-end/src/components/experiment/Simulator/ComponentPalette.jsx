@@ -18,19 +18,19 @@ const ComponentPalette = () => {
     ];
 
     return (
-        <div className="w-48 bg-gray-50 border-r border-gray-200 p-4 flex flex-col gap-3 h-full overflow-y-auto">
-            <h3 className="font-bold text-gray-700 mb-2">Components</h3>
-            <p className="text-xs text-gray-500 mb-4">Drag and drop to canvas</p>
+        <div className="w-48 bg-slate-900 border-r border-slate-700/50 p-4 flex flex-col gap-3 h-full overflow-y-auto">
+            <h3 className="font-bold text-slate-400 mb-2 text-xs uppercase tracking-wider">Components</h3>
+            <p className="text-xs text-slate-500 mb-4">Drag and drop to canvas</p>
 
             {components.map((comp) => (
                 <div
                     key={comp.type}
-                    className="bg-white p-3 rounded shadow-sm border border-gray-200 cursor-move hover:shadow-md flex items-center gap-3 transition"
+                    className="bg-slate-800 p-3 rounded-lg shadow-sm border border-slate-700 cursor-move hover:shadow-lg hover:shadow-blue-900/20 hover:border-blue-500/50 hover:bg-slate-750 transition-all flex items-center gap-3 group"
                     onDragStart={(event) => onDragStart(event, comp.type, comp.label)}
                     draggable
                 >
-                    <span className="text-xl">{comp.icon}</span>
-                    <span className="text-sm font-medium text-gray-700">{comp.label}</span>
+                    <span className="text-xl opacity-80 group-hover:opacity-100 transition-opacity">{comp.icon}</span>
+                    <span className="text-sm font-medium text-slate-300 group-hover:text-white transition-colors">{comp.label}</span>
                 </div>
             ))}
         </div>
