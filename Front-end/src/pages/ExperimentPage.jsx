@@ -1,35 +1,56 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import axios from "axios";
+import { useAuth } from "../context/AuthContext";
 import Sidebar from "../components/Sidebar";
 import Aim from "../components/experiment/Aim";
 import ComponentsRequired from "../components/experiment/ComponentsRequired";
 import Procedure from "../components/experiment/Procedure";
 import Simulation from "../components/experiment/Simulation";
 import Quiz from "../components/experiment/Quiz";
-import { experimentsData } from "../data/experimentsData";
 
 const ExperimentPage = () => {
     const { id } = useParams();
+    const { user } = useAuth();
     const navigate = useNavigate();
     const [activeTab, setActiveTab] = useState("aim");
+    const [experiment, setExperiment] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
 
-    const experiment = experimentsData[id];
+    useEffect(() => {
+        const fetchExperiment = async () => {
+            try {
+                const config = { headers: { Authorization: `Bearer ${user.token}` } };
+                // Fetch classroom details which acts as the experiment definition
+                const { data } = await axios.get(`http://localhost:5000/api/classrooms/${id}`, config);
 
-    if (!experiment) {
-        return (
-            <div className="flex items-center justify-center min-h-screen bg-gray-100">
-                <div className="text-center">
-                    <h2 className="text-2xl font-bold text-gray-800 mb-2">Experiment Not Found</h2>
-                    <button
-                        onClick={() => navigate("/")}
-                        className="text-blue-600 hover:underline"
-                    >
-                        Go back to Dashboard
-                    </button>
-                </div>
-            </div>
-        );
-    }
+                // Transform data if necessary or use directly
+                setExperiment({
+                    id: data._id,
+                    title: data.name,
+                    aim: data.aim || "No aim provided.",
+                    procedure: data.procedure && data.procedure.length > 0 ? data.procedure : ["No procedure provided."],
+                    components: data.components || [],
+                    quiz: data.quiz || [],
+                    code: data.code // store code if needed
+                });
+                setLoading(false);
+            } catch (err) {
+                console.error(err);
+                setError("Failed to load experiment. " + (err.response?.data?.message || err.message));
+                setLoading(false);
+            }
+        };
+
+        if (user && id) {
+            fetchExperiment();
+        }
+    }, [id, user]);
+
+    if (loading) return <div className="text-center p-10">Loading experiment...</div>;
+    if (error) return <div className="text-center p-10 text-red-500">{error}</div>;
+    if (!experiment) return <div className="text-center p-10">Experiment not found</div>;
 
     const renderContent = () => {
         switch (activeTab) {
@@ -40,37 +61,49 @@ const ExperimentPage = () => {
             case "procedure":
                 return <Procedure procedure={experiment.procedure} />;
             case "simulation":
-                return <Simulation />;
+                // experiment object passed here matches what Simulation expects (has title)
+                return <Simulation experiment={experiment} />;
             case "quiz":
-                return <Quiz questions={experiment.quiz} />;
+                return <Quiz questions={experiment.quiz} experimentTitle={experiment.title} />;
             default:
                 return <Aim aim={experiment.aim} />;
         }
     };
 
     return (
-        <div className="min-h-screen bg-gray-50">
+        <div className="min-h-screen bg-gray-50 flex flex-col md:flex-row">
+            {/* Sidebar needs to be updated or mocked if it relies on hardcoded indices */}
+            {/* Assuming sidebar takes activeTab and setter, it should work fine */}
             <Sidebar activeTab={activeTab} onTabChange={setActiveTab} />
 
-            {/* Mobile Header */}
-            <div className="md:hidden bg-white shadow-sm p-4 sticky top-0 z-20 flex justify-between items-center">
-                <h1 className="font-bold text-gray-800 truncate">{experiment.title}</h1>
-                <button
-                    onClick={() => navigate("/")}
-                    className="text-sm text-blue-600 font-medium"
-                >
-                    Exit
-                </button>
-            </div>
+            <div className="flex-grow p-6 lg:p-10 transition-all duration-300 md:ml-64">
+                <div className="md:hidden bg-white shadow-sm p-4 sticky top-0 z-20 flex justify-between items-center mb-6 rounded">
+                    <h1 className="font-bold text-gray-800 truncate">{experiment.title}</h1>
+                    <button
+                        onClick={() => navigate("/student-dashboard")}
+                        className="text-sm text-blue-600 font-medium"
+                    >
+                        Exit
+                    </button>
+                </div>
 
-            <div className="md:ml-64 p-6 lg:p-10 transition-all duration-300">
                 <div className="max-w-4xl mx-auto">
-                    <header className="mb-8 hidden md:block">
-                        <h1 className="text-3xl font-bold text-gray-900">{experiment.title}</h1>
-                        <p className="text-gray-500 mt-1">Experiment ID: {experiment.id}</p>
+                    <header className="mb-8 hidden md:block border-b pb-4">
+                        <div className="flex justify-between items-center">
+                            <div>
+                                <h1 className="text-3xl font-bold text-gray-900">{experiment.title}</h1>
+                                <p className="text-gray-500 mt-1">Classroom Code: {experiment.code}</p>
+                            </div>
+                            <button
+                                onClick={() => navigate("/student-dashboard")}
+                                className="text-blue-600 hover:text-blue-800"
+                            >
+                                ← Back to Dashboard
+                            </button>
+                        </div>
                     </header>
 
-                    <main className="fade-in">
+                    <main className="fade-in bg-white p-6 rounded shadow-sm min-h-[500px]">
                         {renderContent()}
                     </main>
                 </div>

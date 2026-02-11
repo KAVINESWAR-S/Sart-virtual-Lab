@@ -1,9 +1,20 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import axios from 'axios';
+import { useAuth } from "../../context/AuthContext";
 
-const Quiz = ({ questions }) => {
+const Quiz = ({ questions, experimentTitle }) => {
+    // const { id } = useParams(); // Removed
+    // const experiment = experimentsData[id]; // Removed
+    const { user } = useAuth();
+
     const [answers, setAnswers] = useState({});
     const [submitted, setSubmitted] = useState(false);
     const [score, setScore] = useState(0);
+    const [serverLoading, setServerLoading] = useState(false);
+
+    // Initial check just to see if already done? 
+    // Ideally we should check with backend if quiz already submitted, 
+    // but for now let's just handle the submission part.
 
     const handleOptionSelect = (questionIndex, option) => {
         if (submitted) return;
@@ -13,7 +24,7 @@ const Quiz = ({ questions }) => {
         });
     };
 
-    const handleSubmit = () => {
+    const handleSubmit = async () => {
         let newScore = 0;
         questions.forEach((q, index) => {
             if (answers[index] === q.answer) {
@@ -21,6 +32,31 @@ const Quiz = ({ questions }) => {
             }
         });
         setScore(newScore);
+
+        // Save to backend
+        if (user && user.role === 'student' && experiment) {
+            setServerLoading(true);
+            try {
+                const config = {
+                    headers: {
+                        'Content-Type': 'application/json',
+                        Authorization: `Bearer ${user.token}`
+                    },
+                };
+                const payload = {
+                    experimentTitle: experimentTitle,
+                    quizScore: newScore
+                };
+                await axios.post('http://localhost:5000/api/submissions', payload, config);
+                alert('Quiz score saved!');
+            } catch (error) {
+                console.error(error);
+                alert('Failed to save quiz score to server.');
+            } finally {
+                setServerLoading(false);
+            }
+        }
+
         setSubmitted(true);
     };
 
@@ -63,13 +99,13 @@ const Quiz = ({ questions }) => {
 
                     <button
                         onClick={handleSubmit}
-                        disabled={Object.keys(answers).length < questions.length}
-                        className={`w-full py-3 rounded-lg text-white font-semibold transition ${Object.keys(answers).length < questions.length
-                                ? "bg-gray-400 cursor-not-allowed"
-                                : "bg-green-600 hover:bg-green-700"
+                        disabled={Object.keys(answers).length < questions.length || serverLoading}
+                        className={`w-full py-3 rounded-lg text-white font-semibold transition ${Object.keys(answers).length < questions.length || serverLoading
+                            ? "bg-gray-400 cursor-not-allowed"
+                            : "bg-green-600 hover:bg-green-700"
                             }`}
                     >
-                        Submit Quiz
+                        {serverLoading ? "Submitting..." : "Submit Quiz"}
                     </button>
                 </div>
             ) : (

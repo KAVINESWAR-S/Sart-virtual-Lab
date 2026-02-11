@@ -1,7 +1,6 @@
 import React, { memo } from 'react';
 import { Handle, Position } from 'reactflow';
 
-
 const nodeStyles = "bg-white border-2 border-gray-800 rounded shadow-md p-2 min-w-[100px] text-center flex flex-col items-center justify-center relative";
 
 // Battery Node
@@ -31,7 +30,11 @@ export const LEDNode = memo(({ data }) => {
 
 // Switch Node
 export const SwitchNode = memo(({ data }) => {
-    const [isOn, setIsOn] = React.useState(false);
+    const [isOn, setIsOn] = React.useState(!!data.isOn);
+
+    React.useEffect(() => {
+        setIsOn(!!data.isOn);
+    }, [data.isOn]);
 
     const toggleSwitch = () => {
         const newState = !isOn;

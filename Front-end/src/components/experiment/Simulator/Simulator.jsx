@@ -39,12 +39,29 @@ const initialEdges = [];
 let id = 0;
 const getId = () => `dndnode_${id++}`;
 
-const Simulator = () => {
+const DEFAULT_NODES = [];
+const DEFAULT_EDGES = [];
+
+const Simulator = ({ onSubmit, initialNodes = DEFAULT_NODES, initialEdges = DEFAULT_EDGES, readOnly = false }) => {
     const reactFlowWrapper = useRef(null);
     const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
     const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
     const [reactFlowInstance, setReactFlowInstance] = useState(null);
     const [isRunning, setIsRunning] = useState(false);
+
+    // Sync state with props when they change
+    useEffect(() => {
+        // Hydrate nodes with onChange handler which is lost in JSON serialization
+        const hydratedNodes = initialNodes.map(node => ({
+            ...node,
+            data: {
+                ...node.data,
+                onChange: (data) => handleNodeDataChange(node.id, data)
+            }
+        }));
+        setNodes(hydratedNodes);
+        setEdges(initialEdges);
+    }, [initialNodes, initialEdges, setNodes, setEdges]); // Fixed dependency array
 
     // Handle Drag & Drop
     const onDragOver = useCallback((event) => {
@@ -54,6 +71,7 @@ const Simulator = () => {
 
     const onDrop = useCallback(
         (event) => {
+            if (readOnly) return; // Disable drop in readOnly mode
             event.preventDefault();
 
             const type = event.dataTransfer.getData('application/reactflow/type');
@@ -72,12 +90,12 @@ const Simulator = () => {
                 id: getId(),
                 type,
                 position,
-                data: { label, onChange: (data) => handleNodeDataChange(newNode.id, data) }, // Callback for interactive nodes
+                data: { label, onChange: (data) => handleNodeDataChange(newNode.id, data) },
             };
 
             setNodes((nds) => nds.concat(newNode));
         },
-        [reactFlowInstance],
+        [reactFlowInstance, readOnly], // Added readOnly dependency
     );
 
     const onConnect = useCallback(
@@ -95,7 +113,6 @@ const Simulator = () => {
                 return node;
             })
         );
-        // The effect hook will traverse and run simulation when nodes change
         setIsRunning(true);
     };
 
@@ -105,7 +122,6 @@ const Simulator = () => {
             runSimulation(nodes, edges, setNodes);
         } else {
             setIsRunning(false);
-            // Optional: Reset state
         }
     };
 
@@ -114,10 +130,10 @@ const Simulator = () => {
         if (isRunning) {
             interval = setInterval(() => {
                 runSimulation(nodes, edges, setNodes);
-            }, 500); // Update every 500ms
+            }, 500);
         }
         return () => clearInterval(interval);
-    }, [isRunning, nodes, edges]); // Be careful with dependencies to avoid infinite loops
+    }, [isRunning, nodes, edges]);
 
 
     const deleteSelected = useCallback(() => {
@@ -128,7 +144,7 @@ const Simulator = () => {
     return (
         <div className="flex h-[600px] w-full border border-gray-300 rounded-lg overflow-hidden bg-gray-50">
             <ReactFlowProvider>
-                <ComponentPalette />
+                {!readOnly && <ComponentPalette />}
 
                 <div className="flex-grow h-full relative" ref={reactFlowWrapper}>
                     <div className="absolute top-4 right-4 z-10 bg-white p-2 rounded shadow flex gap-2">
@@ -139,32 +155,47 @@ const Simulator = () => {
                         >
                             {isRunning ? '⏹ Stop Simulation' : '▶ Run Simulation'}
                         </button>
-                        <button
-                            onClick={deleteSelected}
-                            className="px-4 py-2 rounded bg-orange-100 text-orange-600 border border-orange-300 hover:bg-orange-200"
-                            title="Delete Selected (Backspace)"
-                        >
-                            🗑 Delete
-                        </button>
-                        <button
-                            onClick={() => { setNodes([]); setEdges([]); }}
-                            className="px-4 py-2 rounded bg-gray-100 text-gray-600 border border-gray-300 hover:bg-gray-200"
-                        >
-                            Clear All
-                        </button>
+                        {!readOnly && (
+                            <>
+                                <button
+                                    onClick={deleteSelected}
+                                    className="px-4 py-2 rounded bg-orange-100 text-orange-600 border border-orange-300 hover:bg-orange-200"
+                                    title="Delete Selected (Backspace)"
+                                >
+                                    🗑 Delete
+                                </button>
+                                <button
+                                    onClick={() => { setNodes([]); setEdges([]); }}
+                                    className="px-4 py-2 rounded bg-gray-100 text-gray-600 border border-gray-300 hover:bg-gray-200"
+                                >
+                                    Clear All
+                                </button>
+                            </>
+                        )}
+                        {onSubmit && !readOnly && (
+                            <button
+                                onClick={() => onSubmit({ nodes, edges })}
+                                className="px-4 py-2 rounded bg-blue-100 text-blue-600 border border-blue-300 hover:bg-blue-200 font-bold"
+                            >
+                                💾 Submit
+                            </button>
+                        )}
                     </div>
 
                     <ReactFlow
                         nodes={nodes}
                         edges={edges}
-                        deleteKeyCode={['Backspace', 'Delete']}
+                        deleteKeyCode={readOnly ? null : ['Backspace', 'Delete']}
                         onNodesChange={onNodesChange}
                         onEdgesChange={onEdgesChange}
-                        onConnect={onConnect}
+                        onConnect={readOnly ? null : onConnect}
                         onInit={setReactFlowInstance}
-                        onDrop={onDrop}
+                        onDrop={readOnly ? null : onDrop}
                         onDragOver={onDragOver}
                         nodeTypes={nodeTypes}
+                        nodesDraggable={!readOnly}
+                        nodesConnectable={!readOnly}
+                        elementsSelectable={true}
                         fitView
                     >
                         <Controls />
