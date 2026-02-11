@@ -35,7 +35,9 @@ router.post('/', protect, teacherOnly, async (req, res) => {
 router.get('/', protect, async (req, res) => {
     try {
         let classrooms;
-        if (req.user.role === 'teacher') {
+        if (req.user.role === 'admin') {
+            classrooms = await Classroom.find({});
+        } else if (req.user.role === 'teacher') {
             classrooms = await Classroom.find({ teacher: req.user._id });
         } else {
             classrooms = await Classroom.find({ students: req.user._id });

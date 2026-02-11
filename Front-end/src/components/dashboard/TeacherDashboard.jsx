@@ -3,7 +3,7 @@ import axios from 'axios';
 import { useAuth } from '../../context/AuthContext';
 import Simulator from '../experiment/Simulator/Simulator';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FaPlus, FaTimes, FaChalkboard, FaUsers, FaArrowRight, FaEdit, FaSave } from 'react-icons/fa';
+import { FaPlus, FaTimes, FaChalkboard, FaUsers, FaArrowRight, FaEdit, FaSave, FaClipboardList } from 'react-icons/fa';
 
 const TeacherDashboard = () => {
     const { user } = useAuth();
@@ -24,6 +24,7 @@ const TeacherDashboard = () => {
     // View/Grade State
     const [selectedClassroom, setSelectedClassroom] = useState(null);
     const [classroomDetails, setClassroomDetails] = useState(null);
+    const [allClassroomSubmissions, setAllClassroomSubmissions] = useState([]); // Store all submissions for the class
     const [selectedStudent, setSelectedStudent] = useState(null);
     const [studentSubmissions, setStudentSubmissions] = useState([]);
     const [gradeInput, setGradeInput] = useState('');
@@ -99,6 +100,10 @@ const TeacherDashboard = () => {
             setClassroomDetails(data);
             setSelectedClassroom(id);
             setSelectedStudent(null);
+
+            // Fetch all submissions for this experiment to show in the table
+            const subRes = await axios.get(`http://localhost:5000/api/submissions?experimentTitle=${encodeURIComponent(data.name)}`, config);
+            setAllClassroomSubmissions(subRes.data);
         } catch (error) { console.error(error); }
     };
 
@@ -128,6 +133,49 @@ const TeacherDashboard = () => {
             setStudentSubmissions(updatedSubmissions);
             alert("Graded successfully!");
         } catch (error) { console.error(error); alert("Failed to grade."); }
+    };
+
+    const getStudentQuizScore = (studentId) => {
+        const sub = allClassroomSubmissions.find(s =>
+            (s.student?._id === studentId || s.student === studentId)
+        );
+        const total = classroomDetails?.quiz?.length || 0;
+        return sub && sub.quizScore != null ? `${sub.quizScore}/${total}` : 'N/A';
+    };
+
+    const exportToCSV = () => {
+        if (!classroomDetails || !classroomDetails.students) return;
+
+        const headers = ["Student Name", "Email", "Quiz Score", "Simulation Grade", "Feedback"];
+        const rows = classroomDetails.students.map(student => {
+            const sub = allClassroomSubmissions.find(s =>
+                (s.student?._id === student._id || s.student === student._id)
+            );
+
+            const totalQuiz = classroomDetails.quiz?.length || 0;
+            // Use 'X out of Y' format to prevent Excel from auto-converting to date (e.g. 5/10 -> 5-Oct)
+            const quizScore = sub && sub.quizScore != null ? `"${sub.quizScore} out of ${totalQuiz}"` : '"N/A"';
+            const grade = sub && sub.grade ? sub.grade : 'N/A';
+            // Escape potential commas in feedback
+            const feedback = sub && sub.feedback ? `"${sub.feedback.replace(/"/g, '""')}"` : '""';
+
+            return [
+                `"${student.name}"`,
+                `"${student.email}"`,
+                quizScore,
+                grade,
+                feedback
+            ].join(",");
+        });
+
+        const csvContent = "data:text/csv;charset=utf-8," + [headers.join(","), ...rows].join("\n");
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", `${classroomDetails.name}_Grades.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
     };
 
     return (
@@ -320,14 +368,21 @@ const TeacherDashboard = () => {
                             </div>
 
                             <div className="glass-panel overflow-hidden">
-                                <div className="p-6 border-b border-slate-700/50">
+                                <div className="p-6 border-b border-slate-700/50 flex justify-between items-center">
                                     <h3 className="font-bold text-xl">Student Roster</h3>
+                                    <button
+                                        onClick={exportToCSV}
+                                        className="text-emerald-400 hover:text-emerald-300 font-medium text-sm border border-emerald-500/30 px-3 py-1 rounded hover:bg-emerald-500/10 transition-all flex items-center gap-2"
+                                    >
+                                        <FaClipboardList /> Export Grades
+                                    </button>
                                 </div>
                                 <table className="w-full text-left">
                                     <thead className="bg-slate-900/50 text-slate-400 uppercase text-xs">
                                         <tr>
                                             <th className="p-4">Student Name</th>
                                             <th className="p-4">Email</th>
+                                            <th className="p-4">Quiz Score</th>
                                             <th className="p-4 text-right">Actions</th>
                                         </tr>
                                     </thead>
@@ -336,6 +391,7 @@ const TeacherDashboard = () => {
                                             <tr key={student._id} className="hover:bg-slate-800/30 transition-colors">
                                                 <td className="p-4 font-medium text-white">{student.name}</td>
                                                 <td className="p-4 text-slate-400">{student.email}</td>
+                                                <td className="p-4 font-mono text-blue-400">{getStudentQuizScore(student._id)}</td>
                                                 <td className="p-4 text-right">
                                                     <button
                                                         className="text-blue-400 hover:text-blue-300 font-medium text-sm border border-blue-500/30 px-3 py-1 rounded hover:bg-blue-500/10 transition-all"

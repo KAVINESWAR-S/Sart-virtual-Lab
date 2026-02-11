@@ -1,7 +1,9 @@
 const express = require('express');
 const router = express.Router();
-const { protect, teacherOnly } = require('../middleware/authMiddleware.js');
+const { protect, teacherOnly, adminOrTeacher } = require('../middleware/authMiddleware.js');
 const Submission = require('../models/Submission.js');
+
+// ... (previous routes)
 
 // @desc    Submit an experiment (Circuit or Quiz)
 // @route   POST /api/submissions
@@ -55,6 +57,23 @@ router.get('/my', protect, async (req, res) => {
 router.get('/student/:studentId', protect, teacherOnly, async (req, res) => {
     try {
         const submissions = await Submission.find({ student: req.params.studentId }).sort({ createdAt: -1 });
+        res.json(submissions);
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+});
+
+// @desc    Get All Submissions (Optional filter by experimentTitle)
+// @route   GET /api/submissions
+// @access  Teacher or Admin
+router.get('/', protect, adminOrTeacher, async (req, res) => {
+    const { experimentTitle } = req.query;
+    try {
+        let query = {};
+        if (experimentTitle) {
+            query.experimentTitle = experimentTitle;
+        }
+        const submissions = await Submission.find(query).populate('student', 'name email').sort({ createdAt: -1 });
         res.json(submissions);
     } catch (error) {
         res.status(500).json({ message: error.message });

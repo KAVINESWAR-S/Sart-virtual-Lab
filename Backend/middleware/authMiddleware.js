@@ -40,4 +40,12 @@ const adminOnly = (req, res, next) => {
     }
 };
 
-module.exports = { protect, teacherOnly, adminOnly };
+const adminOrTeacher = (req, res, next) => {
+    if (req.user && (req.user.role === 'admin' || req.user.role === 'teacher')) {
+        next();
+    } else {
+        res.status(401).json({ message: 'Not authorized as admin or teacher' });
+    }
+};
+
+module.exports = { protect, teacherOnly, adminOnly, adminOrTeacher };

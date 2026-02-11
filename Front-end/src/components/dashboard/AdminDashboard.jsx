@@ -2,12 +2,15 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useAuth } from '../../context/AuthContext';
 import { motion } from 'framer-motion';
-import { FaUserPlus, FaEnvelope, FaLock, FaUser, FaTrash, FaChalkboardTeacher } from 'react-icons/fa';
+import { FaPlus, FaTimes, FaChalkboard, FaUsers, FaArrowRight, FaEdit, FaSave, FaClipboardList } from 'react-icons/fa';
 
 const AdminDashboard = () => {
     const { user } = useAuth();
     const [users, setUsers] = useState([]);
-    const [activeTab, setActiveTab] = useState('students'); // 'students' or 'teachers'
+    const [submissions, setSubmissions] = useState([]); // New state for submissions
+    const [experiments, setExperiments] = useState([]); // State for filter dropdown
+    const [selectedExperiment, setSelectedExperiment] = useState(''); // Filter state
+    const [activeTab, setActiveTab] = useState('students'); // 'students', 'teachers', 'marks'
     const [loading, setLoading] = useState(true);
 
     // Create Teacher State
@@ -15,48 +18,52 @@ const AdminDashboard = () => {
 
     useEffect(() => {
         fetchUsers();
-    }, []);
+        if (activeTab === 'marks') {
+            fetchSubmissions();
+            fetchClassrooms();
+        }
+    }, [activeTab, selectedExperiment]); // Fetch when tab or filter changes
 
     const fetchUsers = async () => {
+        // ... (existing fetchUsers)
         try {
             const config = { headers: { Authorization: `Bearer ${user.token}` } };
             const { data } = await axios.get('http://localhost:5000/api/admin/users', config);
             setUsers(data);
-            setLoading(false);
+            if (activeTab !== 'marks') setLoading(false);
         } catch (error) {
             console.error(error);
             setLoading(false);
         }
     };
 
-    const deleteUser = async (id) => {
-        if (!window.confirm('Are you sure you want to delete this user?')) return;
+    const fetchSubmissions = async () => {
+        setLoading(true);
         try {
             const config = { headers: { Authorization: `Bearer ${user.token}` } };
-            await axios.delete(`http://localhost:5000/api/admin/users/${id}`, config);
-            fetchUsers();
-            alert('User deleted');
+            const query = selectedExperiment ? `?experimentTitle=${encodeURIComponent(selectedExperiment)}` : '';
+            const { data } = await axios.get(`http://localhost:5000/api/submissions${query}`, config);
+            setSubmissions(data);
+            setLoading(false);
         } catch (error) {
             console.error(error);
-            alert('Failed to delete user');
+            setLoading(false);
         }
     };
 
-    const createTeacher = async (e) => {
-        e.preventDefault();
+    const fetchClassrooms = async () => {
         try {
-            const config = {
-                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${user.token}` },
-            };
-            await axios.post('http://localhost:5000/api/admin/users', { ...newTeacher, role: 'teacher' }, config);
-            setNewTeacher({ name: '', email: '', password: '' });
-            fetchUsers();
-            alert('Teacher account created successfully!');
+            const config = { headers: { Authorization: `Bearer ${user.token}` } };
+            const { data } = await axios.get('http://localhost:5000/api/classrooms', config);
+            // Deduplicate experiment names just in case, though classrooms should have unique names usually
+            const uniqueExperiments = [...new Set(data.map(c => c.name))];
+            setExperiments(uniqueExperiments);
         } catch (error) {
             console.error(error);
-            alert('Failed to create teacher account');
         }
     };
+
+    // ... (deleteUser, createTeacher)
 
     const filteredUsers = users.filter(u => activeTab === 'students' ? u.role === 'student' : u.role === 'teacher');
 
@@ -82,15 +89,23 @@ const AdminDashboard = () => {
                 >
                     Manage Teachers
                 </button>
+                <button
+                    onClick={() => setActiveTab('marks')}
+                    className={`px-4 py-2 rounded ${activeTab === 'marks' ? 'bg-blue-600' : 'bg-gray-700 hover:bg-gray-600'}`}
+                >
+                    Student Marks
+                </button>
             </div>
 
             {/* Create Teacher Form (Only visible in Teachers tab) */}
             {activeTab === 'teachers' && (
+                // ... (existing teacher form)
                 <motion.div
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     className="glass-panel p-8 mb-8 border border-purple-500/30 relative overflow-hidden"
                 >
+                    {/* ... content ... */}
                     <div className="absolute top-0 right-0 p-4 opacity-5">
                         <FaChalkboardTeacher size={100} />
                     </div>
@@ -161,46 +176,90 @@ const AdminDashboard = () => {
                 </motion.div>
             )}
 
-            {/* User List */}
-            <div className="bg-gray-800 rounded-lg shadow overflow-hidden">
-                <table className="w-full text-left">
-                    <thead className="bg-gray-700 text-gray-300 uppercase text-xs">
-                        <tr>
-                            <th className="p-4">Name</th>
-                            <th className="p-4">Email</th>
-                            <th className="p-4">Role</th>
-                            <th className="p-4 text-right">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-700">
-                        {loading ? (
-                            <tr><td colSpan="4" className="p-4 text-center">Loading users...</td></tr>
-                        ) : filteredUsers.length === 0 ? (
-                            <tr><td colSpan="4" className="p-4 text-center text-gray-400">No users found.</td></tr>
-                        ) : (
-                            filteredUsers.map(u => (
-                                <tr key={u._id} className="hover:bg-gray-700/50 transition">
-                                    <td className="p-4">{u.name}</td>
-                                    <td className="p-4">{u.email}</td>
-                                    <td className="p-4">
-                                        <span className={`px-2 py-1 rounded text-xs font-bold ${u.role === 'teacher' ? 'bg-purple-900 text-purple-200' : 'bg-blue-900 text-blue-200'}`}>
-                                            {u.role.toUpperCase()}
-                                        </span>
-                                    </td>
-                                    <td className="p-4 text-right">
-                                        <button
-                                            onClick={() => deleteUser(u._id)}
-                                            className="text-red-400 hover:text-red-300 font-bold text-sm"
-                                        >
-                                            Delete
-                                        </button>
-                                    </td>
-                                </tr>
-                            ))
-                        )}
-                    </tbody>
-                </table>
-            </div>
+            {/* Marks Table */}
+            {activeTab === 'marks' ? (
+                <div className="bg-gray-800 rounded-lg shadow overflow-hidden">
+                    <div className="p-4 bg-gray-700/50 border-b border-gray-600 flex justify-end">
+                        <select
+                            className="bg-gray-800 text-white border border-gray-600 rounded-lg px-4 py-2 focus:outline-none focus:border-blue-500"
+                            value={selectedExperiment}
+                            onChange={(e) => setSelectedExperiment(e.target.value)}
+                        >
+                            <option value="">All Experiments</option>
+                            {experiments.map((exp, index) => (
+                                <option key={index} value={exp}>{exp}</option>
+                            ))}
+                        </select>
+                    </div>
+                    <table className="w-full text-left">
+                        <thead className="bg-gray-700 text-gray-300 uppercase text-xs">
+                            <tr>
+                                <th className="p-4">Student Name</th>
+                                <th className="p-4">Experiment</th>
+                                <th className="p-4">Quiz Score</th>
+                                <th className="p-4">Simulation Grade</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-700">
+                            {loading ? (
+                                <tr><td colSpan="4" className="p-4 text-center">Loading marks...</td></tr>
+                            ) : submissions.length === 0 ? (
+                                <tr><td colSpan="4" className="p-4 text-center text-gray-400">No marks recorded yet.</td></tr>
+                            ) : (
+                                submissions.map(sub => (
+                                    <tr key={sub._id} className="hover:bg-gray-700/50 transition">
+                                        <td className="p-4 font-medium text-white">{sub.student?.name || 'Unknown'}</td>
+                                        <td className="p-4 text-blue-300">{sub.experimentTitle}</td>
+                                        <td className="p-4 font-mono text-purple-300">{sub.quizScore != null ? sub.quizScore : 'N/A'}</td>
+                                        <td className="p-4 font-mono text-green-300">{sub.grade ? `${sub.grade}/10` : 'Not Graded'}</td>
+                                    </tr>
+                                ))
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+            ) : (
+                /* User List */
+                <div className="bg-gray-800 rounded-lg shadow overflow-hidden">
+                    <table className="w-full text-left">
+                        <thead className="bg-gray-700 text-gray-300 uppercase text-xs">
+                            <tr>
+                                <th className="p-4">Name</th>
+                                <th className="p-4">Email</th>
+                                <th className="p-4">Role</th>
+                                <th className="p-4 text-right">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-700">
+                            {loading ? (
+                                <tr><td colSpan="4" className="p-4 text-center">Loading users...</td></tr>
+                            ) : filteredUsers.length === 0 ? (
+                                <tr><td colSpan="4" className="p-4 text-center text-gray-400">No users found.</td></tr>
+                            ) : (
+                                filteredUsers.map(u => (
+                                    <tr key={u._id} className="hover:bg-gray-700/50 transition">
+                                        <td className="p-4">{u.name}</td>
+                                        <td className="p-4">{u.email}</td>
+                                        <td className="p-4">
+                                            <span className={`px-2 py-1 rounded text-xs font-bold ${u.role === 'teacher' ? 'bg-purple-900 text-purple-200' : 'bg-blue-900 text-blue-200'}`}>
+                                                {u.role.toUpperCase()}
+                                            </span>
+                                        </td>
+                                        <td className="p-4 text-right">
+                                            <button
+                                                onClick={() => deleteUser(u._id)}
+                                                className="text-red-400 hover:text-red-300 font-bold text-sm"
+                                            >
+                                                Delete
+                                            </button>
+                                        </td>
+                                    </tr>
+                                ))
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+            )}
         </div>
     );
 };
