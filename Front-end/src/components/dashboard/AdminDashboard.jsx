@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useAuth } from '../../context/AuthContext';
 import { motion } from 'framer-motion';
-import { FaPlus, FaTimes, FaChalkboard, FaUsers, FaArrowRight, FaEdit, FaSave, FaClipboardList } from 'react-icons/fa';
+import { FaPlus, FaTimes, FaChalkboard, FaUsers, FaArrowRight, FaEdit, FaSave, FaClipboardList, FaUserPlus, FaUser, FaEnvelope, FaLock } from 'react-icons/fa';
 
 const AdminDashboard = () => {
     const { user } = useAuth();
@@ -63,7 +63,34 @@ const AdminDashboard = () => {
         }
     };
 
-    // ... (deleteUser, createTeacher)
+
+    const createTeacher = async (e) => {
+        e.preventDefault();
+        try {
+            const config = { headers: { Authorization: `Bearer ${user.token}` } };
+            await axios.post('http://localhost:5000/api/admin/users', { ...newTeacher, role: 'teacher' }, config);
+            setNewTeacher({ name: '', email: '', password: '' });
+            fetchUsers();
+            alert('Teacher created successfully!');
+        } catch (error) {
+            console.error(error);
+            alert('Error creating teacher');
+        }
+    };
+
+    const deleteUser = async (id) => {
+        if (window.confirm('Are you sure you want to delete this user?')) {
+            try {
+                const config = { headers: { Authorization: `Bearer ${user.token}` } };
+                await axios.delete(`http://localhost:5000/api/admin/users/${id}`, config);
+                fetchUsers();
+            } catch (error) {
+                console.error(error);
+                alert('Error deleting user');
+            }
+        }
+    };
+
 
     const filteredUsers = users.filter(u => activeTab === 'students' ? u.role === 'student' : u.role === 'teacher');
 
@@ -107,7 +134,7 @@ const AdminDashboard = () => {
                 >
                     {/* ... content ... */}
                     <div className="absolute top-0 right-0 p-4 opacity-5">
-                        <FaChalkboardTeacher size={100} />
+                        <FaChalkboard size={100} />
                     </div>
 
                     <h2 className="text-2xl font-bold mb-6 flex items-center gap-3">
