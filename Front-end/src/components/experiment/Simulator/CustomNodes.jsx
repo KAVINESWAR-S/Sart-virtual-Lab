@@ -17,12 +17,49 @@ export const BatteryNode = memo(({ data }) => {
 
 // LED Node
 export const LEDNode = memo(({ data }) => {
-    const isOn = data.isOn || false;
+    const state = data.ledState || (data.isOn ? 'on' : 'off');
+    const intensity = data.ledIntensity !== undefined ? data.ledIntensity : (state === 'on' ? 0.8 : 0);
+
+    // Default resting visuals based on state
+    let bgClass = 'border-slate-400 bg-slate-50';
+    let icon = '💡';
+
+    // Default physics styling for 'off'
+    let customStyle = {
+        filter: 'grayscale(100%)',
+        opacity: 0.5,
+        boxShadow: 'none'
+    };
+
+    if (state === 'blast') {
+        bgClass = 'border-red-500 bg-red-100 text-red-500';
+        icon = '💥';
+        customStyle = {
+            boxShadow: '0 0 20px rgba(239, 68, 68, 0.8)', // red shadow
+            filter: 'none',
+            opacity: 1
+        };
+    } else if (state === 'on') {
+        bgClass = 'border-yellow-400 bg-yellow-50';
+
+        // Physics mapped to visuals
+        const glowRadius = Math.max(0, intensity * 20); // 0 to 20px
+        const glowOpacity = Math.max(0, intensity * 0.8);
+        const grayScale = Math.max(0, 100 - (intensity * 100)); // 100 off, 0 full brightness
+        const opacity = Math.min(1, 0.5 + (intensity * 0.5));
+
+        customStyle = {
+            boxShadow: `0 0 ${glowRadius}px rgba(234, 179, 8, ${glowOpacity})`, // yellow-500 rgb
+            filter: `grayscale(${grayScale}%)`,
+            opacity: opacity
+        };
+    }
+
     return (
-        <div className={`${nodeStyles} ${isOn ? 'bg-yellow-100 border-yellow-400 shadow-[0_0_15px_rgba(255,255,0,0.6)]' : 'border-gray-400'}`}>
+        <div className={`${nodeStyles} transition-all duration-300 ${bgClass}`} style={customStyle}>
             <Handle type="target" position={Position.Left} id="in" />
-            <div className={`text-3xl transition-all ${isOn ? 'grayscale-0' : 'grayscale opacity-50'}`}>💡</div>
-            <div className="text-xs font-bold mt-1">LED</div>
+            <div className="text-3xl transition-all duration-300">{icon}</div>
+            <div className="text-xs font-bold mt-1 text-slate-800">{data.label || 'LED'}</div>
             <Handle type="source" position={Position.Right} id="out" />
         </div>
     );
@@ -59,11 +96,28 @@ export const SwitchNode = memo(({ data }) => {
 
 // Resistor Node
 export const ResistorNode = memo(({ data }) => {
+    const [resistance, setResistance] = React.useState(data.resistance !== undefined ? data.resistance : 350);
+
+    const handleChange = (e) => {
+        const val = parseInt(e.target.value, 10);
+        // Allow empty string to temporarily show nothing while typing, but default to 0
+        const finalVal = isNaN(val) ? 0 : val;
+        setResistance(finalVal);
+        data.onChange && data.onChange({ resistance: finalVal });
+    };
+
     return (
         <div className={nodeStyles}>
             <Handle type="target" position={Position.Left} id="in" />
-            <div className="text-xl font-bold tracking-widest">〰️</div>
-            <div className="text-xs">1kΩ</div>
+            <div className="text-xl font-bold tracking-widest text-orange-600">〰️</div>
+            <input
+                type="number"
+                value={resistance}
+                onChange={handleChange}
+                className="nodrag w-16 text-center text-xs mt-1 border border-slate-300 rounded focus:outline-none focus:border-blue-500 text-slate-900 bg-white"
+                title="Resistance in Ohms"
+            />
+            <div className="text-[10px] text-gray-500 font-bold uppercase">Ohms Ω</div>
             <Handle type="source" position={Position.Right} id="out" />
         </div>
     );

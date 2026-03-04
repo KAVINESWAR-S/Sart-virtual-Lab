@@ -1,113 +1,49 @@
 export const runSimulation = (nodes, edges, setNodes) => {
-    // Digital Logic Simulation Engine
-    // High = 1 (Voltage/True), Low = 0 (Ground/False)
-
-    // 1. Initialize State Map
-    // Map: NodeID -> { outputs: { handleId: 0|1 }, inputs: { handleId: 0|1 } }
+    // 1. Digital Logic State Map (for backward compatibility with logic gates)
     const state = {};
-
     nodes.forEach(node => {
         state[node.id] = { inputs: {}, outputs: {} };
-
-        // Initialize sources
         if (node.type === 'battery') {
             state[node.id].outputs['pos'] = 1;
             state[node.id].outputs['neg'] = 0;
         }
     });
 
-    // 2. Iterative Logic Solver
-    // We run a few iterations to propagate signals. 
-    // For non-cyclic circuits, Depth = Number of Components is safe.
-    // We'll limit to 10 iterations to prevent infinite loops in cyclic feedbacks.
-
     let hasChanges = true;
     let iterations = 0;
-    const MAX_ITERATIONS = 15;
-
-    while (hasChanges && iterations < MAX_ITERATIONS) {
+    while (hasChanges && iterations < 15) {
         hasChanges = false;
         iterations++;
-
-        // A. Propagate Edges (Output -> Input)
         edges.forEach(edge => {
             const sourceVal = state[edge.source]?.outputs[edge.sourceHandle] || 0;
-
-            // Target Input
             if (state[edge.target]) {
-                const currentInput = state[edge.target].inputs[edge.targetHandle];
-                if (currentInput !== sourceVal) {
+                if (state[edge.target].inputs[edge.targetHandle] !== sourceVal) {
                     state[edge.target].inputs[edge.targetHandle] = sourceVal;
                     hasChanges = true;
                 }
             }
         });
-
-        // B. Compute Component Logic (Input -> Output)
         nodes.forEach(node => {
             const nodeState = state[node.id];
-            const type = node.type;
-
             if (!nodeState) return;
-
             let newOutputs = { ...nodeState.outputs };
-
-            if (type === 'battery') {
-                // Constant
-                newOutputs['pos'] = 1;
-            }
+            const type = node.type;
+            if (type === 'battery') newOutputs['pos'] = 1;
             else if (type === 'switch') {
-                // If Closed (On), Output = Input
-                // If Open (Off), Output = 0
-                // Note: Switch custom node uses specific local state. 
-                // We need to access that state via node.data.
-                // We assumed in CustomNodes that `toggleSwitch` calls `data.onChange`.
-                // But we can't easily read that back unless we store it in `data`.
-                // FIX: Simulator.jsx must capture this.
-                // Assuming `node.data.isOn` is updated by Simulator.jsx or internal state is readable.
-                // For robustness, if `data.label` is "Closed" or verify data.isOn.
-                // Let's rely on `node.data.isOn`. (User needs to ensure Switch updates this).
-
-                /* 
-                   IMPORTANT: In CustomNodes.jsx, SwitchNode uses `const [isOn, setIsOn] = React.useState(false)`.
-                   It DOES call `data.onChange(newState)`.
-                   Simulator.jsx `handleNodeDataChange` triggers `runSimulation`.
-                   BUT it does NOT update the node's `data.isOn` in the ReactFlow store.
-                   We need to fix Simulator.jsx to update node data on change!
-                   
-                   For now, let's assume `data.isOn` is correct.
-                */
-
-                // We'll treat Input 'in' -> Output 'out'
-                const inputVal = nodeState.inputs['in'] || 0;
-                const switchOn = node.data?.isOn;
-                newOutputs['out'] = switchOn ? inputVal : 0;
+                newOutputs['out'] = node.data?.isOn ? (nodeState.inputs['in'] || 0) : 0;
             }
-            else if (type === 'led') {
-                // Pass through? Usually LED drops voltage, but for logic, it just passes 0.
-                // It consumes signal. Output is 0 (Ground-like) or undefined.
-                newOutputs['out'] = 0; // Sink
-            }
-            else if (type === 'resistor') {
-                // Pass through (ignoring resistance for digital logic)
+            else if (type === 'led' || type === 'resistor') {
                 newOutputs['out'] = nodeState.inputs['in'] || 0;
             }
             else if (type === 'andGate') {
-                const a = nodeState.inputs['a'] || 0;
-                const b = nodeState.inputs['b'] || 0;
-                newOutputs['out'] = (a && b) ? 1 : 0;
+                newOutputs['out'] = (nodeState.inputs['a'] && nodeState.inputs['b']) ? 1 : 0;
             }
             else if (type === 'orGate') {
-                const a = nodeState.inputs['a'] || 0;
-                const b = nodeState.inputs['b'] || 0;
-                newOutputs['out'] = (a || b) ? 1 : 0;
+                newOutputs['out'] = (nodeState.inputs['a'] || nodeState.inputs['b']) ? 1 : 0;
             }
             else if (type === 'notGate') {
-                const inp = nodeState.inputs['in'] || 0;
-                newOutputs['out'] = inp ? 0 : 1;
+                newOutputs['out'] = nodeState.inputs['in'] ? 0 : 1;
             }
-
-            // Check for changes
             Object.keys(newOutputs).forEach(key => {
                 if (nodeState.outputs[key] !== newOutputs[key]) {
                     nodeState.outputs[key] = newOutputs[key];
@@ -117,13 +53,165 @@ export const runSimulation = (nodes, edges, setNodes) => {
         });
     }
 
-    // 3. Update Visuals (LEDs)
+    // 2. Analog Circuit Evaluation
+    // Find paths from Battery 'pos' to Battery 'neg'
+    const adjacencyList = {}; // from NodeID -> [{ targetNodeId, targetHandle }]
+    edges.forEach(edge => {
+        if (!adjacencyList[edge.source]) adjacencyList[edge.source] = [];
+        adjacencyList[edge.source].push({ targetNodeId: edge.target, targetHandle: edge.targetHandle, sourceHandle: edge.sourceHandle });
+    });
+
+    const batteryNodes = nodes.filter(n => n.type === 'battery');
+
+    // We will accumulate states for analog components based on whether they are in a closed loop
+    const newComponentStates = {}; // nodeId -> ledState
+
+    batteryNodes.forEach(battery => {
+        // DFS to find paths
+        const paths = [];
+        const dfs = (currentNodeId, currentPath, visited) => {
+            if (currentNodeId === battery.id && currentPath.length > 0) {
+                // Check if the last edge entered 'neg'
+                const lastEdge = currentPath[currentPath.length - 1];
+                if (lastEdge.targetHandle === 'neg') {
+                    paths.push([...currentPath]);
+                }
+                return;
+            }
+
+            if (visited.has(currentNodeId) && currentNodeId !== battery.id) return;
+
+            const node = nodes.find(n => n.id === currentNodeId);
+            if (!node) return;
+
+            // If switch is open, stop path
+            if (node.type === 'switch' && !node.data?.isOn) return;
+
+            // Follow outgoing edges
+            const outgoingEdges = adjacencyList[currentNodeId] || [];
+            // For battery, only leave from 'pos' initially
+            const validEdges = outgoingEdges.filter(e => {
+                if (currentNodeId === battery.id && currentPath.length === 0) return e.sourceHandle === 'pos';
+                return true;
+            });
+
+            validEdges.forEach(edge => {
+                visited.add(currentNodeId);
+                dfs(edge.targetNodeId, [...currentPath, edge], visited);
+                visited.delete(currentNodeId);
+            });
+        };
+
+        dfs(battery.id, [], new Set());
+
+        // Process found paths
+        paths.forEach(path => {
+            let totalResistance = 0;
+            let totalLEDVoltage = 0;
+
+            const pathNodeIds = path.map(e => e.targetNodeId);
+            // pathNodeIds includes the final battery node.
+
+            pathNodeIds.forEach(id => {
+                const node = nodes.find(n => n.id === id);
+                if (!node) return;
+
+                if (node.type === 'resistor') {
+                    totalResistance += (node.data?.resistance !== undefined ? node.data.resistance : 350);
+                } else if (node.type === 'led') {
+                    const is5V = node.data?.label === 'LED (5V)';
+                    totalLEDVoltage += is5V ? 5 : 2;
+                }
+            });
+
+            const batteryVoltage = 9;
+            let current = 0;
+
+            if (totalResistance === 0) {
+                // Short circuit if voltage > 0
+                current = (batteryVoltage > totalLEDVoltage) ? Infinity : 0;
+            } else {
+                current = (batteryVoltage - totalLEDVoltage) / totalResistance;
+            }
+
+            // If negative current (LEDs blocking reverse or not enough voltage), current is 0
+            if (current <= 0) current = 0;
+
+            // Determine LED states in this path
+            pathNodeIds.forEach(id => {
+                const node = nodes.find(n => n.id === id);
+                if (node && node.type === 'led') {
+                    let ledState = 'off';
+                    let ledIntensity = 0;
+
+                    if (current > 0.040) {
+                        ledState = 'blast';
+                        ledIntensity = 1;
+                    } else if (current > 0.001) {
+                        ledState = 'on';
+                        // Physics: Brightness is proportional to current.
+                        // A 5V LED with 9V battery and 350 ohm resistor gets (9-5)/350 = 0.011A (11mA).
+                        // A 2V LED with 350 ohm resistor gets (9-2)/350 = 0.020A (20mA).
+                        // Let's map typical operating current (10mA - 20mA) to 50%-100% brightness.
+                        // Formula: base 0.2 + (current / 0.020) * 0.8
+                        ledIntensity = Math.min(1, 0.2 + (current / 0.020) * 0.8);
+                    }
+
+                    // If multiple paths contain the same LED, take the 'worst' or 'max' state
+                    const precedence = { 'off': 0, 'on': 1, 'blast': 2 };
+                    const currentStateObj = newComponentStates[id] || { state: 'off', intensity: 0 };
+
+                    if (precedence[ledState] > precedence[currentStateObj.state] ||
+                        (ledState === currentStateObj.state && ledIntensity > currentStateObj.intensity)) {
+                        newComponentStates[id] = { state: ledState, intensity: ledIntensity };
+                    }
+                }
+            });
+        });
+    });
+
+    // 3. Update Visuals
     const newNodes = nodes.map(node => {
         if (node.type === 'led') {
-            const inputLevel = state[node.id]?.inputs['in'] || 0;
-            // LED is ON if input is High
-            if (!!node.data.isOn !== !!inputLevel) {
-                return { ...node, data: { ...node.data, isOn: !!inputLevel } };
+            // Analog state
+            const stateObj = newComponentStates[node.id] || { state: 'off', intensity: 0 };
+            let newState = stateObj.state;
+            let newIntensity = stateObj.intensity;
+
+            // Fallback to logic state if not in an analog circuit path
+            if (newState === 'off' && state[node.id]?.inputs['in']) {
+                // Backward trace to ensure this digital signal came from a logic gate,
+                // NOT an unclosed analog battery circuit.
+                let isDigital = false;
+                const checkDigital = (currentNodeId, visited = new Set()) => {
+                    if (visited.has(currentNodeId)) return;
+                    visited.add(currentNodeId);
+
+                    const incomingEdges = edges.filter(e => e.target === currentNodeId);
+                    for (let edge of incomingEdges) {
+                        const sourceNode = nodes.find(n => n.id === edge.source);
+                        if (!sourceNode) continue;
+
+                        if (['andGate', 'orGate', 'notGate'].includes(sourceNode.type)) {
+                            isDigital = true;
+                            return;
+                        }
+                        if (['switch', 'resistor'].includes(sourceNode.type)) {
+                            checkDigital(sourceNode.id, visited);
+                        }
+                    }
+                };
+
+                checkDigital(node.id);
+
+                if (isDigital) {
+                    newState = 'on'; // fallback for digital logic gates connected to LED
+                    newIntensity = 0.8;
+                }
+            }
+
+            if (node.data.ledState !== newState || node.data.ledIntensity !== newIntensity) {
+                return { ...node, data: { ...node.data, ledState: newState, ledIntensity: newIntensity } };
             }
         }
         return node;

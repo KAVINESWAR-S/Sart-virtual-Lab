@@ -9,7 +9,8 @@ const ComponentPalette = () => {
 
     const components = [
         { type: 'battery', label: 'Battery (9V)', icon: '🔋' },
-        { type: 'led', label: 'LED', icon: '💡' },
+        { type: 'led', label: 'LED (2V)', icon: '💡' },
+        { type: 'led', label: 'LED (5V)', icon: '💡' },
         { type: 'switch', label: 'Switch', icon: '🔌' },
         { type: 'resistor', label: 'Resistor', icon: '〰️' },
         { type: 'andGate', label: 'AND Gate', icon: 'AND' },
